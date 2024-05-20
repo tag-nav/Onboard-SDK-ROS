@@ -1,6 +1,7 @@
 FILE(GLOB EXAMPLES *.cc *.c *.cpp)
 
 include_directories(stereo_utility)
+include_directories(/home/brg/catkin_ws/src/Onboard-SDK-ROS/include/dji_osdk_ros)
 
 if(ENABLE_OPEN_CV_CONTRIB)
 add_definitions(-DUSE_OPEN_CV_CONTRIB)

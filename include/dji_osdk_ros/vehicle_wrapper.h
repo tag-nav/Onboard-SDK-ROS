@@ -272,6 +272,7 @@ namespace dji_osdk_ros
       Vector3f vector3FSub(const Vector3f& vectorA,const Vector3f& vectorB);
       float32_t vectorNorm(Vector3f v);
       void horizCommandLimit(float speedFactor, float& commandX,float& commandY);
+      void vertiCommandLimit(float zspeedFactor, float& commandZ);
       Vector3f quaternionToEulerAngle(const Telemetry::Quaternion& quat);
       static Vector3f localOffsetFromGpsAndFusedHeightOffset(const Telemetry::GPSFused& target,
                                                              const Telemetry::GPSFused& origin,

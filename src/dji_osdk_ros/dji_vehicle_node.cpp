@@ -53,11 +53,11 @@ VehicleNode::VehicleNode():telemetry_from_fc_(TelemetryType::USE_ROS_BROADCAST),
   nh_.param("/vehicle_node/enc_key",       enc_key_, std::string("abcde123"));
   nh_.param("/vehicle_node/acm_name",      device_acm_, std::string("/dev/ttyACM0"));
   nh_.param("/vehicle_node/serial_name",   device_, std::string("/dev/ttyUSB0"));
-  nh_.param("/vehicle_node/baud_rate",     baud_rate_, 921600);
+  nh_.param("/vehicle_node/baud_rate",     baud_rate_, 1000000);
   nh_.param("/vehicle_node/app_version",   app_version_, 1);
   nh_.param("/vehicle_node/drone_version", drone_version_, std::string("M300")); // choose M300 as default
   nh_.param("/vehicle_node/gravity_const", gravity_const_, 9.801);
-  nh_.param("/vehicle_node/align_time",    align_time_with_FC_, false);
+  nh_.param("/vehicle_node/align_time",    align_time_with_FC_, true);
   nh_.param("/vehicle_node/use_broadcast", user_select_broadcast_, false);
   bool enable_ad = false;
 #ifdef ADVANCED_SENSING

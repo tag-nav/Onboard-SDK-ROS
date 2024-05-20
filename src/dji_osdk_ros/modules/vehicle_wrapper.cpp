@@ -1597,6 +1597,12 @@ static T_OsdkOsalHandler osalHandler = {
       commandY = signOfData<float>(commandY) * speedFactor;
   }
 
+  void VehicleWrapper::vertiCommandLimit(float zspeedFactor, float& commandZ)
+  {
+    if (fabs(commandZ) > zspeedFactor)
+      commandZ = signOfData<float>(commandZ) * zspeedFactor;
+  }
+
   float32_t VehicleWrapper::vectorNorm(Vector3f v)
   {
     return sqrt(pow(v.x, 2) + pow(v.y, 2) + pow(v.z, 2));
@@ -1629,6 +1635,7 @@ static T_OsdkOsalHandler osalHandler = {
     int outOfBounds = 0;
     int brakeCounter = 0;
     int speedFactor = 2;
+    float zSpeedFactor = 0.5;
 
     /* now we need position-height broadcast to obtain the real-time altitude of the aircraft, 
     * which is consistent with the altitude closed-loop data of flight control internal position control

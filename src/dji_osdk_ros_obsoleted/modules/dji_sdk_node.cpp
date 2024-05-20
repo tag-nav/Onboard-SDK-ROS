@@ -21,7 +21,7 @@ DJISDKNode::DJISDKNode(ros::NodeHandle& nh, ros::NodeHandle& nh_private, int arg
 {
   nh_private.param("acm_name",      acm_device, std::string("/dev/ttyACM0"));
   nh_private.param("serial_name",   serial_device, std::string("/dev/ttyUSB0"));
-  nh_private.param("baud_rate",     baud_rate, 921600);
+  nh_private.param("baud_rate",     baud_rate, 1000000);
   nh_private.param("app_id",        app_id,    123456);
   nh_private.param("app_version",   app_version, 1);
   nh_private.param("enc_key",       enc_key, std::string("abcd1234"));
