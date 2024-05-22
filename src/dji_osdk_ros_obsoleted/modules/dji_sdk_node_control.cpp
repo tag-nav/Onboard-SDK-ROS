@@ -29,89 +29,89 @@
  */
 void DJISDKNode::flightControl(uint8_t flag, float xSP, float ySP, float zSP, float yawSP)
 {
-  uint8_t HORI  = (flag & 0xC0);
-  uint8_t VERT  = (flag & 0x30);
-  uint8_t YAW   = (flag & 0x08);
-  uint8_t FRAME = (flag & 0x06);
-  uint8_t HOLD  = (flag & 0x01);
+  // uint8_t HORI  = (flag & 0xC0);
+  // uint8_t VERT  = (flag & 0x30);
+  // uint8_t YAW   = (flag & 0x08);
+  // uint8_t FRAME = (flag & 0x06);
+  // uint8_t HOLD  = (flag & 0x01);
 
-  double xCmd, yCmd, zCmd, yawCmd;
-  if (FRAME == Control::HORIZONTAL_GROUND)
-  {
-    // 1.1 Horizontal channels
-    if ( (HORI == Control::HORIZONTAL_VELOCITY) || (HORI == Control::HORIZONTAL_POSITION) )
-    {
-      xCmd = ySP;
-      yCmd = xSP;
-    }
-    else
-    {
-      //ROS_DEBUG("GROUND frame is specified, but angle and rate command is generated in body frame");
-      xCmd = RAD2DEG(xSP);
-      yCmd = RAD2DEG(-ySP);
-    }
+  // double xCmd, yCmd, zCmd, yawCmd;
+  // if (FRAME == Control::HORIZONTAL_GROUND)
+  // {
+  //   // 1.1 Horizontal channels
+  //   if ( (HORI == Control::HORIZONTAL_VELOCITY) || (HORI == Control::HORIZONTAL_POSITION) )
+  //   {
+  //     xCmd = ySP;
+  //     yCmd = xSP;
+  //   }
+  //   else
+  //   {
+  //     //ROS_DEBUG("GROUND frame is specified, but angle and rate command is generated in body frame");
+  //     xCmd = RAD2DEG(xSP);
+  //     yCmd = RAD2DEG(-ySP);
+  //   }
 
-    // 1.2 Verticle Channel
-    if ( (VERT == Control::VERTICAL_VELOCITY) || (VERT == Control::VERTICAL_POSITION) )
-    {
-      zCmd = zSP;
-    }
-    else
-    {
-      //ROS_WARN_THROTTLE(1.0, "GROUND frame is specified, but thrust command is generated in body frame");
-      zCmd = zSP;
-    }
-  }
-  else if(FRAME == Control::HORIZONTAL_BODY)
-  {
-    // 2.1 Horizontal channels
-    if ( (HORI == Control::HORIZONTAL_VELOCITY) || (HORI == Control::HORIZONTAL_POSITION) )
-    {
-      // The X and Y Vel and Pos should be only based on rotation after Yaw,
-      // whithout roll and pitch. Otherwise the behavior will be weird.
+  //   // 1.2 Verticle Channel
+  //   if ( (VERT == Control::VERTICAL_VELOCITY) || (VERT == Control::VERTICAL_POSITION) )
+  //   {
+  //     zCmd = zSP;
+  //   }
+  //   else
+  //   {
+  //     //ROS_WARN_THROTTLE(1.0, "GROUND frame is specified, but thrust command is generated in body frame");
+  //     zCmd = zSP;
+  //   }
+  // }
+  // else if(FRAME == Control::HORIZONTAL_BODY)
+  // {
+  //   // 2.1 Horizontal channels
+  //   if ( (HORI == Control::HORIZONTAL_VELOCITY) || (HORI == Control::HORIZONTAL_POSITION) )
+  //   {
+  //     // The X and Y Vel and Pos should be only based on rotation after Yaw,
+  //     // whithout roll and pitch. Otherwise the behavior will be weird.
 
-      // Transform from F-R to F-L
-      xCmd = xSP;
-      yCmd = -ySP;
-    }
-    else
-    {
-      xCmd = RAD2DEG(xSP);
-      yCmd = RAD2DEG(-ySP);
-    }
+  //     // Transform from F-R to F-L
+  //     xCmd = xSP;
+  //     yCmd = -ySP;
+  //   }
+  //   else
+  //   {
+  //     xCmd = RAD2DEG(xSP);
+  //     yCmd = RAD2DEG(-ySP);
+  //   }
 
-    // 2.2 Vertical channel
-    if ( (VERT == Control::VERTICAL_VELOCITY) || (VERT == Control::VERTICAL_POSITION)  )
-    {
-      //ROS_WARN_THROTTLE(1.0, "BODY frame is specified, but hight and z-velocity is generated in ground frame");
-      zCmd = zSP;
-    }
-    else
-    {
-      zCmd = zSP;
-    }
-  }
+  //   // 2.2 Vertical channel
+  //   if ( (VERT == Control::VERTICAL_VELOCITY) || (VERT == Control::VERTICAL_POSITION)  )
+  //   {
+  //     //ROS_WARN_THROTTLE(1.0, "BODY frame is specified, but hight and z-velocity is generated in ground frame");
+  //     zCmd = zSP;
+  //   }
+  //   else
+  //   {
+  //     zCmd = zSP;
+  //   }
+  // }
 
-  // The behavior of yaw should be the same in either frame
-  if ( YAW == Control::YAW_ANGLE )
-  {
-    tf::Matrix3x3 rotationSrc;
-    rotationSrc.setRPY(0.0, 0.0, yawSP);
+  // // The behavior of yaw should be the same in either frame
+  // if ( YAW == Control::YAW_ANGLE )
+  // {
+  //   tf::Matrix3x3 rotationSrc;
+  //   rotationSrc.setRPY(0.0, 0.0, yawSP);
 
-    //The last term should be transpose, but since it's symmetric ...
-    tf::Matrix3x3 rotationDes (R_ENU2NED * rotationSrc * R_FLU2FRD);
+  //   //The last term should be transpose, but since it's symmetric ...
+  //   tf::Matrix3x3 rotationDes (R_ENU2NED * rotationSrc * R_FLU2FRD);
 
-    double temp1, temp2;
-    rotationDes.getRPY(temp1, temp2, yawCmd);
+  //   double temp1, temp2;
+  //   rotationDes.getRPY(temp1, temp2, yawCmd);
 
-    yawCmd = RAD2DEG(yawCmd);
-  }
-  else if (YAW == Control::YAW_RATE)
-  {
-    yawCmd = RAD2DEG(-yawSP);
-  }
+  //   yawCmd = RAD2DEG(yawCmd);
+  // }
+  // else if (YAW == Control::YAW_RATE)
+  // {
+  //   yawCmd = RAD2DEG(-yawSP);
+  // }
 
-  Control::CtrlData ctrlData(flag, xCmd, yCmd, zCmd, yawCmd);
+  Control::CtrlData ctrlData(flag, xSP, ySP, zSP, yawSP);
   vehicle->control->flightCtrl(ctrlData);
 }
 
