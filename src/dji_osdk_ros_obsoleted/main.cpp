@@ -52,10 +52,6 @@ bool generateSinusoidalTraj(DJISDKNode* dji_sdk_node_, float amplitude, float fr
 
 bool generateSingleCmd(DJISDKNode* dji_sdk_node_, float xSP, float ySP, float zSP, float yawSP, string filename);
 
-bool moveByPosAndSpeed(DJISDKNode* dji_sdk_node_, 
-                    float xSP, float ySP, float zSP, float yawSP,
-                    float posThresholdInM, float yawThresholdInDeg, float zThresholdInM, float speed, float32_t groundHeight, string filename);
-
 bool PIDTracking(DJISDKNode* dji_sdk_node_, 
                     float xSP, float ySP, float zSP, float yawSP, float speed, float32_t groundHeight, string filename);
 
@@ -226,37 +222,14 @@ int main(int argc, char **argv) {
   ROS_INFO("Take off done!");
 
   // Save the commands requested in csv file
-  string filename = "/home/brg/supernal/flight_control/Jun12_pid_tuning_desired1.csv";
+  string filename = "/home/brg/supernal/flight_control/Jun13_z_pid_desired3.csv";
   writeCSVHeader(filename);
 
-  PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
-  PIDTracking(dji_sdk_node, -19.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
-  PIDTracking(dji_sdk_node, 19.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  PIDTracking(dji_sdk_node, 0.0, 0.0, 10.0, 0.0, 0.3, groundHeight, filename);
 
-  // moveByPosOffset(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.1, 0.1, 0.1, groundHeight, filename);
-  // ros::Duration(5).sleep();
-  // float32_t heightAfterTakeoff = gps_position_.altitude;
-  // float32_t originalHeight = heightAfterTakeoff - groundHeight;
-  // generateSinusoidalTraj(dji_sdk_node, 1, 0.005, 400, originalHeight, filename);
-
-  // // Move drone by x, y, z, yaw command
-  // moveByPosOffset(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.2, 1, 0.2, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 1 over!");  
-  // ros::Duration(2).sleep();
-  // moveByPosOffset(dji_sdk_node, -20.0, 0.0, 5, 0.0, 0.2, 1, 0.2, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 2 over!");
-  // ros::Duration(2).sleep();
-  // moveByPosOffset(dji_sdk_node, 20.0, 0.0, 3.0, 0.0, 0.2, 1, 0.2, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 3 over!");
-
-  // moveByPosAndSpeed(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.2, 1, 0.2, 0.1, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 1 over!"); 
-  // moveByPosAndSpeed(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.2, 1, 0.2, 0.1, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 2 over!"); 
-  // moveByPosAndSpeed(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.2, 1, 0.2, 0.1, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 3 over!"); 
-  // moveByPosAndSpeed(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.2, 1, 0.2, 0.1, groundHeight, filename);
-  // ROS_INFO_STREAM("Step 4 over!"); 
+  // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, -19.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, 19.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
 
   // Land
   droneTaskControl.request.task = dji_osdk_ros::DroneTaskControl::Request::TASK_LAND;
@@ -474,90 +447,6 @@ bool generateSinusoidalTraj(DJISDKNode* dji_sdk_node_, float amplitude, float fr
   return true;
 }
 
-bool moveByPosAndSpeed(DJISDKNode* dji_sdk_node_, 
-                    float xSP, float ySP, float zSP, float yawSP,
-                    float posThresholdInM, float yawThresholdInDeg, float zThresholdInM, float speed, float32_t groundHeight, string filename)
-{
-  uint8_t ctrl_flag = (DJI::OSDK::Control::VERTICAL_POSITION |
-                       DJI::OSDK::Control::HORIZONTAL_POSITION |
-                       DJI::OSDK::Control::YAW_ANGLE |
-                       DJI::OSDK::Control::HORIZONTAL_GROUND |
-                       DJI::OSDK::Control::STABLE_ENABLE);
-  
-  int responseTimeout = 1;
-  int timeoutInMilSec = 40000;
-  int controlFreqInHz = 50;  // Hz
-  float cycleTime = 1.0 / controlFreqInHz;
-  float cycleTimeInMs = cycleTime * 1000;
-  int outOfControlBoundsTimeLimit = 10 * cycleTimeInMs;    // 10 cycles
-  int withinControlBoundsTimeReqmt = 1 * cycleTimeInMs;  // 100 cycles
-  int elapsedTimeInMs = 0;
-  int withinBoundsCounter = 0;
-  int outOfBounds = 0;
-  int brakeCounter = 0;
-  double speedFactor = 1.0;
-  double currentDistance = 0;
-  double currentSpeed = 0;
-  double expectedTime = 0;
-  double numCycle = 0;
-  double offsetPerCycleZ = 0;
-  double s = 0;
-
-  float yawDesiredInDeg = yawSP;
-  double yawDesiredRad     = deg2rad * yawDesiredInDeg;
-  double yawThresholdInRad = deg2rad * yawThresholdInDeg;
-  vector3f positionCommand = {0, 0, 0};
-
-  // Get original position and current position from GPS (RTK) data
-  double currentRTKLat = (gps_position_.latitude)*deg2rad;
-  double currentRTKLong = (gps_position_.longitude)*deg2rad;
-  double currentHeight = gps_position_.altitude;
-  double originalRTKLat = currentRTKLat;
-  double originalRTKLong = currentRTKLong;
-  double originalHeight = currentHeight;
-  
-  vector3f offsetDesired = {xSP, ySP, zSP-(originalHeight-groundHeight)};
-  vector3f offsetRemaining = {0, 0, originalHeight-groundHeight};
-  vector3f localoffset = localOffsetFromRTKOffset(currentRTKLat, currentRTKLong, originalRTKLat, originalRTKLong, currentHeight, groundHeight);
-
-  double distance = vectorNorm(offsetDesired);
-  double timeTaken = distance/speed;
-  ros::Time rosTime = ros::Time::now();
-  double startTime = rosTime.sec + rosTime.nsec / 1e9;
-  double currentTime = startTime;
-  numCycle = timeTaken / cycleTime;
-  double offsetPerCycleX = xSP / numCycle;
-  double offsetPerCycleY = ySP / numCycle;
-  
-  while (s < 1) {
-    rosTime = ros::Time::now();
-    currentTime = rosTime.sec + rosTime.nsec / 1e9;
-    s = (currentTime - startTime) / timeTaken;
-    positionCommand.x = offsetPerCycleX;
-    positionCommand.y = offsetPerCycleY;
-    positionCommand.z = (1-s) * (originalHeight-groundHeight) + s * zSP;
-    
-    DataRow row;
-    row.time = currentTime;
-    row.x = positionCommand.x;
-    row.y = positionCommand.y;
-    row.z = positionCommand.z;
-    writeCSVRow(filename, row);
-    ROS_INFO("position Command: %f, %f, %f", positionCommand.x, positionCommand.y, positionCommand.z);
-
-    currentRTKLat = (gps_position_.latitude)*deg2rad;
-    currentRTKLong = (gps_position_.longitude)*deg2rad;
-    currentHeight = gps_position_.altitude;
-    localoffset = localOffsetFromRTKOffset(currentRTKLat, currentRTKLong, originalRTKLat, originalRTKLong, currentHeight, groundHeight);
-    ROS_INFO("Local offset: %f, %f, %f", localoffset.x, localoffset.y, localoffset.z);
-
-    dji_sdk_node_->flightControl(ctrl_flag, positionCommand.x, positionCommand.y, positionCommand.z, yawDesiredInDeg);
-    usleep(cycleTimeInMs * 1000);
-  }
-  
-  return true;
-}
-
 bool PIDTracking(DJISDKNode* dji_sdk_node_, 
                     float xSP, float ySP, float zSP, float yawSP, float speed, float32_t groundHeight, string filename)
 {
@@ -610,12 +499,14 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
 
   double Ku_xy = 1.4;
   double Pu_xy = 1.2;
-  double Ku_z = 3.4;
-  double Pu_z = 2.9;
+  double Ku_z = 3.38;
+  double Pu_z = 1.8;
   PID pid_x(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
   PID pid_y(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
-  PID pid_z(Ku_z/1.7, Pu_z/2, 10);
-  
+  PID pid_z(Ku_z/1.7, Pu_z/2, 10)
+  // PID pid_z(40, 20, 5);
+
+
   while (s < 1) {
     rosTime = ros::Time::now();
     currentTime = rosTime.sec + rosTime.nsec / 1e9;
@@ -624,6 +515,7 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
     double desired_x = s * xSP;
     double control_x = pid_x.calculate(desired_x, localoffset.x, cycleTime);
     positionCommand.x = control_x;
+    // positionCommand.x = desired_x - localoffset.x;
 
     double desired_y = s * ySP;
     double control_y = pid_y.calculate(desired_y, localoffset.y, cycleTime);
@@ -631,7 +523,7 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
 
     double desired_z = (1-s) * (originalHeight-groundHeight) + s * zSP;
     double control_z = pid_z.calculate(desired_z, currentHeight-groundHeight, cycleTime);
-    positionCommand.z += control_z * cycleTime;
+    positionCommand.z = desired_z + control_z;
     // positionCommand.z = originalHeight-groundHeight;
 
     DataRow row;
