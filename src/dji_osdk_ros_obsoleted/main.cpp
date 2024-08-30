@@ -222,14 +222,16 @@ int main(int argc, char **argv) {
   ROS_INFO("Take off done!");
 
   // Save the commands requested in csv file
-  string filename = "/home/brg/supernal/flight_control/Jun13_z_pid_desired3.csv";
+  string filename = "/home/brg/supernal/flight_control/Jun17_z_pid_cmd3.csv";
   writeCSVHeader(filename);
-
-  PIDTracking(dji_sdk_node, 0.0, 0.0, 10.0, 0.0, 0.3, groundHeight, filename);
-
+  // PIDTracking(dji_sdk_node, 0.0, 0.0, 10.0, 0.0, 0.3, groundHeight, filename);
   // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
-  // PIDTracking(dji_sdk_node, -19.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
-  // PIDTracking(dji_sdk_node, 19.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
+
+  PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  PIDTracking(dji_sdk_node, -19.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
+  PIDTracking(dji_sdk_node, 19.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
 
   // Land
   droneTaskControl.request.task = dji_osdk_ros::DroneTaskControl::Request::TASK_LAND;
@@ -501,10 +503,29 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   double Pu_xy = 1.2;
   double Ku_z = 3.38;
   double Pu_z = 1.8;
+  double Kp_z = Ku_z / 1.7;
+  double Ti_z = Pu_z / 2;
+  double Ki_z = Kp_z / Ti_z;
+  double Td_z = Pu_z / 8;
+  double Kd_z = Kp_z * Td_z + 2;
+
+//Ku_xy / 1.7 = 0.8235
+  double Kp_xy = Ku_xy/ 1.7; //0.8235
+  double Ti_xy = Pu_xy/ 2;  //0.6
+  double Ki_xy = Kp_xy / Ti_xy;//1.37
+  double Td_xy = Pu_xy / 8;//0.15
+  double Kd_xy = Kp_xy * Td_xy; //0.1235
   PID pid_x(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
   PID pid_y(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
-  PID pid_z(Ku_z/1.7, Pu_z/2, 10)
-  // PID pid_z(40, 20, 5);
+  // PID pid_z(Ku_z/1.7, Pu_z/2, 8);
+
+  // PID pid_x(Kp_xy, Ti_xy, Td_xy); 
+  // PID pid_y(Kp_xy, Ti_xy, Kd_xy);
+  PID pid_z(Kp_z, Ki_z, Kd_z);
+
+
+  // PID pid_z(Ku_xy/1.7, Pu_xy/2, Pu_xy/8); 
+  // PID pid_z(Ku_xy/1.7, Pu_xy/2, Pu_xy/8); 
 
 
   while (s < 1) {
