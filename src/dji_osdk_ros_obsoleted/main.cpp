@@ -26,6 +26,12 @@ struct DataRow {
     double x;
     double y;
     double z;
+    double x_input;
+    double y_input;
+    double z_input;
+    double x_error;
+    double y_error;
+    double z_error;
 };
 
 geometry_msgs::QuaternionStamped attitude_data_;
@@ -127,7 +133,7 @@ void writeCSVHeader(const std::string& filename) {
     }
 
     // Write the header
-    file << "time,x,y,z\n";
+    file << "time,x,y,z,x_input,y_input,z_input\n";
 
     file.close();
 
@@ -145,7 +151,7 @@ void writeCSVRow(const std::string& filename, const DataRow& row) {
     }
 
     // Write the data row
-    file << fixed << setprecision(9) << row.time << "," << row.x << "," << row.y << "," << row.z << "\n";
+    file << fixed << setprecision(9) << row.time << "," << row.x << "," << row.y << "," << row.z << "," << row.x_input << "," << row.y_input << "," << row.z_input <<","<<row.x_error<<","<<row.y_error<<","<<row.z_error<<"\n";
 
     file.close();
 
@@ -503,10 +509,10 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   double Pu_xy = 1.2;
   double Ku_z = 3.38;
   double Pu_z = 1.8;
-  double Kp_z = Ku_z / 1.7;
-  double Ti_z = Pu_z / 2;
-  double Ki_z = Kp_z / Ti_z;
-  double Td_z = Pu_z / 8;
+  double Kp_z = Ku_z / 1.7; // 0.8235
+  double Ti_z = Pu_z / 2;   //0.9
+  double Ki_z = Kp_z / Ti_z; //0.915
+  double Td_z = Pu_z / 8; //0.225
   double Kd_z = Kp_z * Td_z + 2;
 
 //Ku_xy / 1.7 = 0.8235
@@ -517,10 +523,11 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   double Kd_xy = Kp_xy * Td_xy; //0.1235
   PID pid_x(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
   PID pid_y(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
-  // PID pid_z(Ku_z/1.7, Pu_z/2, 8);
+  // PID pid_z(Ku_z/1.7, Pu_z/2, 10);
 
   // PID pid_x(Kp_xy, Ti_xy, Td_xy); 
   // PID pid_y(Kp_xy, Ti_xy, Kd_xy);
+  // PID pid_z(Kp_z, Ki_z, Kd_z);
   PID pid_z(Kp_z, Ki_z, Kd_z);
 
 
@@ -552,6 +559,12 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
     row.x = desired_x;
     row.y = desired_y;
     row.z = desired_z;
+    row.x_input = control_x;
+    row.y_input = control_y;
+    row.z_input = control_z + desired_z;
+    row.x_error = desired_x - localoffset.x;
+    row.y_error = desired_y - localoffset.y;
+    row.z_error = desired_z - (currentHeight - groundHeight);
     writeCSVRow(filename, row);
     ROS_INFO("position Command: %f, %f, %f", positionCommand.x, positionCommand.y, positionCommand.z);
 
