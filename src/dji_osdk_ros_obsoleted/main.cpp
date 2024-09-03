@@ -32,6 +32,8 @@ struct DataRow {
     double x_error;
     double y_error;
     double z_error;
+    double cur_minus_gnd_height;
+    double ground_height;
 };
 
 geometry_msgs::QuaternionStamped attitude_data_;
@@ -133,7 +135,7 @@ void writeCSVHeader(const std::string& filename) {
     }
 
     // Write the header
-    file << "time,x,y,z,x_input,y_input,z_input\n";
+    file << "time,x,y,z,x_input,y_input,z_input, x_error, y_error, z_error, cur_minus_gnd_height, ground_height\n";
 
     file.close();
 
@@ -151,7 +153,11 @@ void writeCSVRow(const std::string& filename, const DataRow& row) {
     }
 
     // Write the data row
-    file << fixed << setprecision(9) << row.time << "," << row.x << "," << row.y << "," << row.z << "," << row.x_input << "," << row.y_input << "," << row.z_input <<","<<row.x_error<<","<<row.y_error<<","<<row.z_error<<"\n";
+    file << fixed << setprecision(9) << row.time << "," << row.x << "," << row.y << "," << row.z 
+    << "," << row.x_input << "," << row.y_input << "," << row.z_input <<","
+    <<row.x_error<<","<<row.y_error<<","<<row.z_error<<"," 
+    <<row.cur_minus_gnd_height<<","
+    <<row.ground_height<<"\n";
 
     file.close();
 
@@ -167,11 +173,11 @@ class PID {
 
   double calculate(double setpoint, double measured_value, double dt) {
     double error = setpoint - measured_value;
-    ROS_INFO("error: %f", error);
+    // ROS_INFO("error: %f", error);
     integral_ += error * dt;
     double derivative = (error - prev_error_) / dt;
     double output = kp_ * error + ki_* integral_ + kd_ * derivative;
-    ROS_INFO("kp, ki, kd: %f, %f, %f", kp_*error, ki_*integral_, kd_ * derivative);
+    // ROS_INFO("kp, ki, kd: %f, %f, %f", kp_*error, ki_*integral_, kd_ * derivative);
     prev_error_ = error;
 
     return output;
@@ -214,6 +220,7 @@ int main(int argc, char **argv) {
   bool takeoff_result;
   bool land_result; 
 
+  //!
   float32_t groundHeight = gps_position_.altitude;
 
   // Take off   
@@ -226,6 +233,7 @@ int main(int argc, char **argv) {
   }
   ros::Duration(10).sleep();
   ROS_INFO("Take off done!");
+  ROS_INFO("Takeoff Height: %f", gps_position_.altitude);
 
   // Save the commands requested in csv file
   string filename = "/home/brg/supernal/flight_control/Jun17_z_pid_cmd3.csv";
@@ -246,7 +254,7 @@ int main(int argc, char **argv) {
   if (land_result){
     ROS_INFO("Drone landing!");
   }
-
+  ROS_INFO("Ground Height: %f", gps_position_.altitude);
   ros::waitForShutdown();
 
   delete dji_sdk_node;
@@ -565,14 +573,17 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
     row.x_error = desired_x - localoffset.x;
     row.y_error = desired_y - localoffset.y;
     row.z_error = desired_z - (currentHeight - groundHeight);
+    row.cur_minus_gnd_height = currentHeight - groundHeight;
+    row.ground_height = groundHeight;
+
     writeCSVRow(filename, row);
-    ROS_INFO("position Command: %f, %f, %f", positionCommand.x, positionCommand.y, positionCommand.z);
+    // ROS_INFO("position Command: %f, %f, %f", positionCommand.x, positionCommand.y, positionCommand.z);
 
     currentRTKLat = (gps_position_.latitude)*deg2rad;
     currentRTKLong = (gps_position_.longitude)*deg2rad;
     currentHeight = gps_position_.altitude;
     localoffset = localOffsetFromRTKOffset(currentRTKLat, currentRTKLong, originalRTKLat, originalRTKLong, currentHeight, groundHeight);
-    ROS_INFO("Local offset: %f, %f, %f", localoffset.x, localoffset.y, localoffset.z);
+    // ROS_INFO("Local offset: %f, %f, %f", localoffset.x, localoffset.y, localoffset.z);
 
     dji_sdk_node_->flightControl(ctrl_flag, positionCommand.x, positionCommand.y, positionCommand.z, yawDesiredInDeg);
     usleep(cycleTimeInMs * 1000);
