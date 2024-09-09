@@ -222,7 +222,7 @@ int main(int argc, char **argv) {
 
   //!
   float32_t groundHeight = gps_position_.altitude;
-
+  ROS_INFO("Ground Height: %f", groundHeight);
   // Take off   
   dji_osdk_ros::DroneTaskControl droneTaskControl;
   droneTaskControl.request.task = dji_osdk_ros::DroneTaskControl::Request::TASK_TAKEOFF;
@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
   ROS_INFO("Takeoff Height: %f", gps_position_.altitude);
 
   // Save the commands requested in csv file
-  string filename = "/home/brg/supernal/flight_control/Jun17_z_pid_cmd3.csv";
+  string filename = "/home/brg/supernal/flight_control/Sep9_data/sep9_pid_tune.csv";
   writeCSVHeader(filename);
   // PIDTracking(dji_sdk_node, 0.0, 0.0, 10.0, 0.0, 0.3, groundHeight, filename);
   // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
   if (land_result){
     ROS_INFO("Drone landing!");
   }
-  ROS_INFO("Ground Height: %f", gps_position_.altitude);
+  
   ros::waitForShutdown();
 
   delete dji_sdk_node;
@@ -524,12 +524,12 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   double Kd_z = Kp_z * Td_z + 2;
 
 //Ku_xy / 1.7 = 0.8235
-  double Kp_xy = Ku_xy/ 1.7; //0.8235
+  double Kp_xy = 2 * Ku_xy/ 1.7; //0.8235
   double Ti_xy = Pu_xy/ 2;  //0.6
   double Ki_xy = Kp_xy / Ti_xy;//1.37
   double Td_xy = Pu_xy / 8;//0.15
   double Kd_xy = Kp_xy * Td_xy; //0.1235
-  PID pid_x(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
+  PID pid_x(1.75 * Ku_xy/1.7, Pu_xy/2, 0.45);
   PID pid_y(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
   // PID pid_z(Ku_z/1.7, Pu_z/2, 10);
 
@@ -539,7 +539,7 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   PID pid_z(Kp_z, Ki_z, Kd_z);
 
 
-  // PID pid_z(Ku_xy/1.7, Pu_xy/2, Pu_xy/8); 
+  // PID pid_z(Ku_xy/1.7, Pu_xy/2, 10); 
   // PID pid_z(Ku_xy/1.7, Pu_xy/2, Pu_xy/8); 
 
 
@@ -586,6 +586,8 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
     // ROS_INFO("Local offset: %f, %f, %f", localoffset.x, localoffset.y, localoffset.z);
 
     dji_sdk_node_->flightControl(ctrl_flag, positionCommand.x, positionCommand.y, positionCommand.z, yawDesiredInDeg);
+    // dji_sdk_node_->flightControl(ctrl_flag, desired_x - localoffset.x, desired_y - localoffset.y, desired_z, yawDesiredInDeg);
+
     usleep(cycleTimeInMs * 1000);
   }
   
