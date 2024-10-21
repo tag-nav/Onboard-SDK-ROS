@@ -39,6 +39,7 @@ struct DataRow {
 geometry_msgs::QuaternionStamped attitude_data_;
 sensor_msgs::NavSatFix rtk_position_;
 sensor_msgs::NavSatFix gps_position_;
+sensor_msgs::Imu imu_;
 std_msgs::Float32 height_above_takeoff_;
 
 ros::ServiceClient sdk_ctrl_authority_service;
@@ -49,6 +50,7 @@ ros::Subscriber gpsPositionSub;
 ros::Subscriber attitudeSub;
 ros::Subscriber heightSub;
 ros::Subscriber gpsSub;
+ros::Subscriber imuSub;
 
 ros::Publisher ctrlPosYawPub;
 ros::Publisher ctrlBrakePub;
@@ -72,11 +74,18 @@ bool set_local_position();
 void attitudeSubCallback(const geometry_msgs::QuaternionStampedConstPtr& attitudeData)
 {attitude_data_ = *attitudeData;}
 
-void rtkPositionSubCallback(const sensor_msgs::NavSatFix::ConstPtr& rtkPosition)
-{rtk_position_ = *rtkPosition;}
+void rtkPositionSubCallback(const sensor_msgs::NavSatFix::ConstPtr& rtkPosition){
+// {gps_position_ = *rtkPosition;
+  rtk_position_ = *rtkPosition;
+}
+
+
 
 void gpsPositionSubCallback(const sensor_msgs::NavSatFix::ConstPtr& gpsPosition)
 {gps_position_ = *gpsPosition;}
+
+void imuSubCallback(const sensor_msgs::Imu::ConstPtr& imu)
+{imu_ = *imu;}
 
 void heightSubCallback(const std_msgs::Float32::ConstPtr& heightAboveTakeoff)
 {height_above_takeoff_ = *heightAboveTakeoff;}
@@ -169,14 +178,17 @@ void writeCSVRow(const std::string& filename, const DataRow& row) {
 class PID {
   public:
     PID(double kp, double ki, double kd)
-    : kp_(kp), ki_(ki), kd_(kd), prev_error_(0), integral_(0) {}
+    : kp_(kp), ki_(ki), kd_(kd), prev_error_(0), integral_(0){}
 
   double calculate(double setpoint, double measured_value, double dt) {
     double error = setpoint - measured_value;
     // ROS_INFO("error: %f", error);
     integral_ += error * dt;
     double derivative = (error - prev_error_) / dt;
+    // filtered_d = a * derivative + (1-a) * prev_d;
     double output = kp_ * error + ki_* integral_ + kd_ * derivative;
+    // double output = kp_ * error + ki_* integral_ + kd_ * filtered_d;
+    // prev_d = filtered_d;
     // ROS_INFO("kp, ki, kd: %f, %f, %f", kp_*error, ki_*integral_, kd_ * derivative);
     prev_error_ = error;
 
@@ -188,6 +200,9 @@ class PID {
     double kp_, ki_, kd_;
     double prev_error_;
     double integral_;
+    // const double a = 0.3;
+    // double prev_d;
+    // double filtered_d;
 };
 
 
@@ -199,9 +214,11 @@ int main(int argc, char **argv) {
   DJISDKNode* dji_sdk_node = new DJISDKNode(nh, nh_private, argc, argv);
 
   attitudeSub      = nh.subscribe("dji_osdk_ros/attitude", 10, &attitudeSubCallback);
+  // gpsPositionSub   = nh.subscribe("dji_osdk_ros/rtk_position", 10, &rtkPositionSubCallback);
   rtkPositionSub   = nh.subscribe("dji_osdk_ros/rtk_position", 10, &rtkPositionSubCallback);
   gpsPositionSub   = nh.subscribe("dji_osdk_ros/gps_position", 10, &gpsPositionSubCallback);
   heightSub        = nh.subscribe("dji_osdk_ros/height_above_takeoff", 10, &heightSubCallback);
+  imuSub           = nh.subscribe("dji_osdk_ros/imu", 10,  &imuSubCallback);
 
   // Publish the control signal
 
@@ -236,16 +253,17 @@ int main(int argc, char **argv) {
   ROS_INFO("Takeoff Height: %f", gps_position_.altitude);
 
   // Save the commands requested in csv file
-  string filename = "/home/brg/supernal/flight_control/Sep9_data/sep9_pid_tune.csv";
+  string filename = "/home/brg/supernal/flight_control/oct6/pid_test8.csv";
   writeCSVHeader(filename);
-  // PIDTracking(dji_sdk_node, 0.0, 0.0, 10.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, -10.0, 0.0, 1.2, 0.0, 0.3, groundHeight, filename);
   // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
   // PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
-  // PIDTracking(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
+  // PIDTracking(dji_sdk_node, 0.0, 0.0, 5.0, 0.0, 0.3, gsroundHeight, filename);
 
   PIDTracking(dji_sdk_node, 0.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
-  PIDTracking(dji_sdk_node, -19.0, 0.0, 5.0, 0.0, 0.3, groundHeight, filename);
-  PIDTracking(dji_sdk_node, 19.0, 0.0, 3.0, 0.0, 0.3, groundHeight, filename);
+  // // PIDTracking(dji_sdk_node, -3.0, 0.0, 1.2, 0.0, 0.5, groundHeight, filename);
+  PIDTracking(dji_sdk_node, -19, 0, 5.0, 0.0, 0.3, groundHeight, filename);
+  PIDTracking(dji_sdk_node, 19, 0, 3.0, 0.0, 0.3, groundHeight, filename);
 
   // Land
   droneTaskControl.request.task = dji_osdk_ros::DroneTaskControl::Request::TASK_LAND;
@@ -467,13 +485,15 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
                     float xSP, float ySP, float zSP, float yawSP, float speed, float32_t groundHeight, string filename)
 {
   uint8_t ctrl_flag = (DJI::OSDK::Control::VERTICAL_POSITION |
-                       DJI::OSDK::Control::HORIZONTAL_POSITION |
+                       DJI::OSDK::Control::HORIZONTAL_POSITION|
                        DJI::OSDK::Control::YAW_ANGLE |
-                       DJI::OSDK::Control::HORIZONTAL_GROUND |
+                       DJI::OSDK::Control::HORIZONTAL_GROUND|
                        DJI::OSDK::Control::STABLE_ENABLE);
   
   int responseTimeout = 1;
   int timeoutInMilSec = 40000;
+  // int controlFreqInHz = 5;  // Hz
+
   int controlFreqInHz = 50;  // Hz
   float cycleTime = 1.0 / controlFreqInHz;
   float cycleTimeInMs = cycleTime * 1000;
@@ -529,10 +549,10 @@ bool PIDTracking(DJISDKNode* dji_sdk_node_,
   double Ki_xy = Kp_xy / Ti_xy;//1.37
   double Td_xy = Pu_xy / 8;//0.15
   double Kd_xy = Kp_xy * Td_xy; //0.1235
-  PID pid_x(1.75 * Ku_xy/1.7, Pu_xy/2, 0.45);
-  PID pid_y(Ku_xy/1.7, Pu_xy/2, Pu_xy/8);
-  // PID pid_z(Ku_z/1.7, Pu_z/2, 10);
 
+  PID pid_x(1.75 * Ku_xy/1.7, Pu_xy/2, Td_xy); // originally this was 0.56 for kd, ki = pu_xy/2
+  PID pid_y(Ku_xy/1.7, Pu_xy/2, Td_xy);
+  // PID pid_z(Ku_z/1.7, Pu_z/2, 10);
   // PID pid_x(Kp_xy, Ti_xy, Td_xy); 
   // PID pid_y(Kp_xy, Ti_xy, Kd_xy);
   // PID pid_z(Kp_z, Ki_z, Kd_z);
